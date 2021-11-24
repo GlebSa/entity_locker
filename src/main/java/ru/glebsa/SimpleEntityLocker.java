@@ -2,7 +2,10 @@ package ru.glebsa;
 
 import org.apache.log4j.Logger;
 
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -14,7 +17,7 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
     private final ConcurrentMap<T, ReentrantLock> lockMap;
 
     //using for protection from deadlocks
-    private final ThreadLocal<T> threadLocal;
+    private final ThreadLocal<Set<T>> threadLocal;
 
 
     public SimpleEntityLocker() {
@@ -34,7 +37,7 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
         lockMap.computeIfAbsent(id, o -> new ReentrantLock())
                 .lockInterruptibly();
 
-        threadLocal.set(id);
+        saveLockedId(id);
 
         return true;
     }
@@ -49,8 +52,13 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
         }
 
         log.debug(Thread.currentThread().getName() + " acquires lock");
-        return lockMap.computeIfAbsent(id, o -> new ReentrantLock())
-                .tryLock(timout, unit);
+        if (lockMap.computeIfAbsent(id, o -> new ReentrantLock())
+                .tryLock(timout, unit)) {
+
+            saveLockedId(id);
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -76,7 +84,7 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
             if (flag) {
                 /*FIXME there is a small chance of checkForDeadlockPossibility() == true while it is already false,
                 *  solution: implement your own QueuedSynchronizer instead of using ReentrantLock*/
-                threadLocal.remove();
+                removeLockedId(id);
             }
         }
     }
@@ -85,9 +93,29 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
         return !lockMap.isEmpty();
     }
 
+    private void saveLockedId(T id) {
+        Set<T> ids = Optional.ofNullable(threadLocal.get())
+                .map(HashSet::new)
+                .orElse(new HashSet<>());
+        ids.add(id);
+        threadLocal.set(ids);
+    }
+
+    private void removeLockedId(T id) {
+        Set<T> ids = Optional.ofNullable(threadLocal.get())
+                .map(HashSet::new)
+                .orElse(new HashSet<>());
+        ids.remove(id);
+        if (ids.isEmpty()) {
+            threadLocal.remove();
+        } else {
+            threadLocal.set(ids);
+        }
+    }
+
     private boolean checkForDeadlockPossibility(T id) {
-        T threadId = threadLocal.get();
-        if (threadId != null && !threadId.equals(id) && lockMap.containsKey(id)) {
+        Set<T> ids = threadLocal.get();
+        if (ids != null && !ids.contains(id) && lockMap.containsKey(id)) {
             log.warn("Lock not acquired due to the possibility of deadlock!");
             return true;
         }
