@@ -16,6 +16,11 @@ import java.util.stream.LongStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Class contains basic tests to cover key points in SimpleEntityLocker
+ * if it will be used in real projects, for classes of this level, there should be much more tests
+ * in particular, there should be stress tests
+ */
 class SimpleEntityLockerTest {
     private final Logger log = Logger.getLogger(SimpleEntityLockerTest.class);
 

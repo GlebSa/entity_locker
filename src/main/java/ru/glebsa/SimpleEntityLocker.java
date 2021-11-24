@@ -11,6 +11,23 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * Simple EntityLocker based on ConcurrentMap and ReentrantLock
+ * for each Id, own ReentrantLock is created, which exists until lock is unlocked
+ * or as long as there is a queue of threads for blocking by the current Id.
+ * <p>
+ * Can be used for reentrant.
+ * <p>
+ * ThreadLocal is used to protect against deadlocks, adds Id to the current thread,
+ * in case of an attempt to capture one more id, which is already captured by another thread,
+ * acquire of lock will be rejected
+ * <p>
+ * Implemented for demo purposes
+ * there are some simplifications, in particular a small possibility of a memory leak,
+ * and a small probability of failure when obtaining a lock due to protection against deadlocks
+ *
+ * @param <T> type of Id
+ */
 public final class SimpleEntityLocker<T> implements EntityLocker<T> {
     private final Logger log = Logger.getLogger(SimpleEntityLocker.class);
 
@@ -83,7 +100,7 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
 
             if (flag) {
                 /*FIXME there is a small chance of checkForDeadlockPossibility() == true while it is already false,
-                *  solution: implement your own QueuedSynchronizer instead of using ReentrantLock*/
+                 *  solution: implement your own QueuedSynchronizer instead of using ReentrantLock*/
                 removeLockedId(id);
             }
         }
