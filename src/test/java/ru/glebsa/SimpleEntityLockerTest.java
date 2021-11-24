@@ -1,5 +1,6 @@
 package ru.glebsa;
 
+import org.apache.log4j.Logger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,16 +16,19 @@ import java.util.stream.LongStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class SimpleLockerTest {
+class SimpleEntityLockerTest {
+    private final Logger log = Logger.getLogger(SimpleEntityLockerTest.class);
 
     private ExecutorService executor;
-    private SimpleLocker<Long> locker;
+    private SimpleEntityLocker<Long> locker;
     private CountDownLatch latch;
+    private final AtomicBoolean exceptionOccurred = new AtomicBoolean();
 
     @BeforeEach
     void init() {
         executor = Executors.newFixedThreadPool(10);
-        locker = new SimpleLocker<>();
+        locker = new SimpleEntityLocker<>();
+        exceptionOccurred.set(false);
     }
 
     @Test
@@ -40,11 +44,12 @@ class SimpleLockerTest {
         LongStream.range(0, count)
                 .mapToObj(i -> new TestRunnable(i, n -> {
                     try {
-                        locker.lock(id);
+                        lockWithExceptionOnFalse(id);
                         longs.add(n);
                         Thread.sleep(10);
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                        exceptionOccurred.set(true);
                     } finally {
                         locker.unlock(id);
                         latch.countDown();
@@ -56,6 +61,7 @@ class SimpleLockerTest {
         executor.shutdown();
 
         //then
+        assertFalse(exceptionOccurred.get());
         assertFalse(locker.hasActiveLocks());
 
         Set<Long> expected = LongStream.range(0, count)
@@ -74,9 +80,10 @@ class SimpleLockerTest {
         LongStream.range(0, count)
                 .mapToObj(i -> new TestRunnable(i, n -> {
                     try {
-                        locker.lock(n);
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                        lockWithExceptionOnFalse(n);
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                        exceptionOccurred.set(true);
                     } finally {
                         locker.unlock(n);
                         latch.countDown();
@@ -88,6 +95,7 @@ class SimpleLockerTest {
         executor.shutdown();
 
         //then
+        assertFalse(exceptionOccurred.get());
         assertFalse(locker.hasActiveLocks());
     }
 
@@ -108,8 +116,9 @@ class SimpleLockerTest {
                             longs.add(n);
                             Thread.sleep(10);
                         }
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                        exceptionOccurred.set(true);
                     } finally {
                         locker.unlock(id);
                         latch.countDown();
@@ -121,6 +130,7 @@ class SimpleLockerTest {
         executor.shutdown();
 
         //then
+        assertFalse(exceptionOccurred.get());
         assertFalse(locker.hasActiveLocks());
 
         Set<Long> expected = LongStream.range(0, count)
@@ -146,8 +156,9 @@ class SimpleLockerTest {
                             longs.add(n);
                             Thread.sleep(10);
                         }
-                    } catch (InterruptedException e) {
-                        throw new IllegalStateException(e);
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                        exceptionOccurred.set(true);
                     } finally {
                         locker.unlock(id);
                         latch.countDown();
@@ -159,6 +170,7 @@ class SimpleLockerTest {
         executor.shutdown();
 
         //then
+        assertFalse(exceptionOccurred.get());
         assertFalse(locker.hasActiveLocks());
 
         Set<Long> expected = LongStream.range(0, count)
@@ -170,7 +182,6 @@ class SimpleLockerTest {
 
     @Test
     void testReentrant() throws Exception {
-
         //given
         latch = new CountDownLatch(1);
         final Long id = 1L;
@@ -179,11 +190,12 @@ class SimpleLockerTest {
         //when
         executor.submit(() -> {
             try {
-                locker.lock(id);
-                locker.lock(id);
-                locker.lock(id);
-            } catch (InterruptedException e) {
-                throw new IllegalStateException(e);
+                lockWithExceptionOnFalse(id);
+                lockWithExceptionOnFalse(id);
+                lockWithExceptionOnFalse(id);
+            } catch (Exception e) {
+                log.error(e.getMessage(), e);
+                exceptionOccurred.set(true);
             } finally {
                 locker.unlock(id);
 
@@ -199,8 +211,65 @@ class SimpleLockerTest {
         latch.await();
 
         //then
+        assertFalse(exceptionOccurred.get());
         assertTrue(flag.get());
         assertFalse(locker.hasActiveLocks());
+    }
+
+    @Test
+    void testDeadlockAvoid() throws Exception {
+        //given
+        final Long id1 = 1L;
+        final Long id2 = 2L;
+        latch = new CountDownLatch(2);
+        final AtomicBoolean firstLockAcquired = new AtomicBoolean();
+        final AtomicBoolean secondLockAcquired = new AtomicBoolean();
+
+        //when
+        executor.submit(() -> {
+            try {
+                if (locker.lock(id1)) {
+                    Thread.sleep(100);
+                    firstLockAcquired.set(locker.lock(id2));
+                }
+            } catch (InterruptedException e) {
+                log.error(e.getMessage(), e);
+                exceptionOccurred.set(true);
+            } finally {
+                locker.unlock(id1);
+                locker.unlock(id2);
+
+                latch.countDown();
+            }
+        });
+        executor.submit(() -> {
+            try {
+                if (locker.lock(id2)) {
+                    secondLockAcquired.set(locker.lock(id1));
+                }
+            } catch (InterruptedException e) {
+                log.error(e.getMessage(), e);
+                exceptionOccurred.set(true);
+            } finally {
+                locker.unlock(id2);
+                locker.unlock(id1);
+
+                latch.countDown();
+            }
+        });
+
+        latch.await();
+
+        //then
+        assertFalse(exceptionOccurred.get());
+        assertTrue(firstLockAcquired.get());
+        assertFalse(secondLockAcquired.get());
+    }
+
+    private void lockWithExceptionOnFalse(Long n) throws InterruptedException, IllegalMonitorStateException {
+        if (!locker.lock(n)) {
+            throw new IllegalMonitorStateException("Lock not acquired!");
+        }
     }
 
 }

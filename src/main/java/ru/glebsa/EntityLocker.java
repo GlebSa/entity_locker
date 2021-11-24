@@ -2,9 +2,9 @@ package ru.glebsa;
 
 import java.util.concurrent.TimeUnit;
 
-public interface Locker<ID> {
+public interface EntityLocker<ID> {
 
-    void lock(ID id) throws InterruptedException;
+    boolean lock(ID id) throws InterruptedException;
 
     boolean lock(ID id, long timout, TimeUnit unit) throws InterruptedException;
 
