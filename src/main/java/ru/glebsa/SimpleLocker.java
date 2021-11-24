@@ -11,11 +11,9 @@ import java.util.concurrent.locks.ReentrantLock;
 public final class SimpleLocker<T> implements Locker<T> {
     private final Logger log = Logger.getLogger(SimpleLocker.class);
 
-    private final boolean fair;
     private final ConcurrentMap<T, ReentrantLock> lockMap;
 
-    public SimpleLocker(boolean fair) {
-        this.fair = fair;
+    public SimpleLocker() {
         this.lockMap = new ConcurrentHashMap<>();
     }
 
@@ -24,7 +22,7 @@ public final class SimpleLocker<T> implements Locker<T> {
         Objects.requireNonNull(id, "Id mast not be null!");
 
         log.debug(Thread.currentThread().getName() + " acquires lock");
-        lockMap.computeIfAbsent(id, o -> new ReentrantLock(fair))
+        lockMap.computeIfAbsent(id, o -> new ReentrantLock())
                 .lockInterruptibly();
     }
 
@@ -35,7 +33,7 @@ public final class SimpleLocker<T> implements Locker<T> {
 
         log.debug(Thread.currentThread().getName() + " acquires lock");
 
-        return lockMap.computeIfAbsent(id, o -> new ReentrantLock(fair))
+        return lockMap.computeIfAbsent(id, o -> new ReentrantLock())
                 .tryLock(timout, unit);
     }
 
@@ -47,7 +45,7 @@ public final class SimpleLocker<T> implements Locker<T> {
         if (lock != null && lock.isHeldByCurrentThread()) {
             log.debug(Thread.currentThread().getName() + " releases lock");
 
-            if (!lock.hasQueuedThreads()) {
+            if (!lock.hasQueuedThreads() && lock.getHoldCount() == 1) {
                 log.debug(Thread.currentThread().getName() + " removes lock");
 
                 /*FIXME hasQueuedThreads not guarantee that lock has queued threads
