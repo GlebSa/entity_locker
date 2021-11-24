@@ -35,12 +35,12 @@ or as long as there is a queue of threads for blocking by the current Id.
 
 Can be used for reentrant.
 
-ThreadLocal is used to protect against deadlocks, adds Id to the current thread,
+ThreadLocal is used to protect against deadlocks, adds Id to the current thread if it acquired lock,
 in case of an attempt to capture one more id, which is already captured by another thread,
-acquire of lock will be rejected
+acquire of lock for another id will be rejected
 
 Implemented for demo purposes
-there are some simplifications, in particular a small possibility of a memory leak,
+there are some simplifications, in result is a small possibility of a memory leak due remove ReentrantLock,
 and a small probability of failure when obtaining a lock due to protection against deadlocks
 
 #Not implemented

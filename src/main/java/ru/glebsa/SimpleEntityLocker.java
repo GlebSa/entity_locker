@@ -18,12 +18,12 @@ import java.util.concurrent.locks.ReentrantLock;
  * <p>
  * Can be used for reentrant.
  * <p>
- * ThreadLocal is used to protect against deadlocks, adds Id to the current thread,
+ * ThreadLocal is used to protect against deadlocks, adds Id to the current thread if it acquired lock,
  * in case of an attempt to capture one more id, which is already captured by another thread,
- * acquire of lock will be rejected
+ * acquire of lock for another id will be rejected
  * <p>
  * Implemented for demo purposes
- * there are some simplifications, in particular a small possibility of a memory leak,
+ * there are some simplifications, in result is a small possibility of a memory leak due remove ReentrantLock,
  * and a small probability of failure when obtaining a lock due to protection against deadlocks
  *
  * @param <T> type of Id
@@ -44,7 +44,7 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
 
     @Override
     public boolean lock(T id) throws InterruptedException {
-        Objects.requireNonNull(id, "Id mast not be null!");
+        Objects.requireNonNull(id, "Id must not be null!");
 
         if (checkForDeadlockPossibility(id)) {
             return false;
@@ -61,8 +61,8 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
 
     @Override
     public boolean lock(T id, long timout, TimeUnit unit) throws InterruptedException {
-        Objects.requireNonNull(id, "Id mast not be null!");
-        Objects.requireNonNull(unit, "TimeUnit mast not be null!");
+        Objects.requireNonNull(id, "Id must not be null!");
+        Objects.requireNonNull(unit, "TimeUnit must not be null!");
 
         if (checkForDeadlockPossibility(id)) {
             return false;
@@ -80,7 +80,7 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
 
     @Override
     public void unlock(T id) {
-        Objects.requireNonNull(id, "Id mast not be null!");
+        Objects.requireNonNull(id, "Id must not be null!");
         ReentrantLock lock = lockMap.get(id);
 
         if (lock != null && lock.isHeldByCurrentThread()) {

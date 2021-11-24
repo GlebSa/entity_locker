@@ -4,6 +4,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The interface for managing locks by entity Id, similar to locking rows in a database
+ * Ids must be immutable or effectively immutable,
+ * if using different instances for same id, need to override equals() and hashcode()
  *
  * @param <ID> type of Id
  */
