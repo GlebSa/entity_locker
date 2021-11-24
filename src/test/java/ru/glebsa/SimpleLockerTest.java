@@ -170,6 +170,7 @@ class SimpleLockerTest {
 
     @Test
     void testReentrant() throws Exception {
+
         //given
         latch = new CountDownLatch(1);
         final Long id = 1L;
