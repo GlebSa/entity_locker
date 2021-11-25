@@ -23,8 +23,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * acquire of lock for another id will be rejected
  * <p>
  * Implemented for demo purposes
- * there are some simplifications, in result is a small possibility of a memory leak due remove ReentrantLock,
- * and a small probability of failure when obtaining a lock due to protection against deadlocks
+ * there are some simplifications, in result is a small possibility of a memory leak due remove ReentrantLock
  *
  * @param <T> type of Id
  */
@@ -94,15 +93,11 @@ public final class SimpleEntityLocker<T> implements EntityLocker<T> {
                  *  demon thread end expire time for each lock */
                 lockMap.remove(id);
             }
-            boolean flag = lock.getHoldCount() == 1;
-
-            lock.unlock();
-
-            if (flag) {
-                /*FIXME there is a small chance of checkForDeadlockPossibility() == true while it is already false,
-                 *  solution: implement your own QueuedSynchronizer instead of using ReentrantLock*/
+            if (lock.getHoldCount() == 1) {
                 removeLockedId(id);
             }
+
+            lock.unlock();
         }
     }
 

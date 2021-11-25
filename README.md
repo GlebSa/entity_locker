@@ -40,8 +40,7 @@ in case of an attempt to capture one more id, which is already captured by anoth
 acquire of lock for another id will be rejected
 
 Implemented for demo purposes
-there are some simplifications, in result is a small possibility of a memory leak due remove ReentrantLock,
-and a small probability of failure when obtaining a lock due to protection against deadlocks
+there are some simplifications, in result is a small possibility of a memory leak due remove ReentrantLock
 
 #Not implemented
 Bonus requirements IV and V
